@@ -22,6 +22,7 @@
 typedef struct unpack_user {
     bool use_list;
     bool raw;
+    bool bytes_memoryview;
     bool has_pairs_hook;
     bool strict_map_key;
     int timestamp;
@@ -256,7 +257,13 @@ static inline int unpack_callback_bin(unpack_user* u, const char* b, const char*
         return -1;
     }
 
-    PyObject *py = PyBytes_FromStringAndSize(p, l);
+    PyObject *py;
+    if (u->bytes_memoryview) {
+        py = PyMemoryView_FromMemory((char *)p, l, PyBUF_READ);
+    }
+    else {
+        py = PyBytes_FromStringAndSize(p, l);
+    }
     if (!py)
         return -1;
     *o = py;

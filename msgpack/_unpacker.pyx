@@ -26,6 +26,7 @@ cdef extern from "unpack.h":
     ctypedef struct msgpack_user:
         bint use_list
         bint raw
+        bint bytes_memoryview
         bint has_pairs_hook # call object_hook with k-v pairs
         bint strict_map_key
         int timestamp
@@ -60,7 +61,8 @@ cdef extern from "unpack.h":
 cdef inline init_ctx(unpack_context *ctx,
                      object object_hook, object object_pairs_hook,
                      object list_hook, object ext_hook,
-                     bint use_list, bint raw, int timestamp,
+                     bint use_list, bint raw, bint bytes_memoryview,
+                     int timestamp,
                      bint strict_map_key,
                      const char* unicode_errors,
                      Py_ssize_t max_str_len, Py_ssize_t max_bin_len,
@@ -69,6 +71,7 @@ cdef inline init_ctx(unpack_context *ctx,
     unpack_init(ctx)
     ctx.user.use_list = use_list
     ctx.user.raw = raw
+    ctx.user.bytes_memoryview = bytes_memoryview
     ctx.user.strict_map_key = strict_map_key
     ctx.user.object_hook = ctx.user.list_hook = <PyObject*>NULL
     ctx.user.max_str_len = max_str_len
@@ -141,7 +144,8 @@ cdef inline int get_data_from_buffer(object obj,
 
 
 def unpackb(object packed, *, object object_hook=None, object list_hook=None,
-            bint use_list=True, bint raw=False, int timestamp=0, bint strict_map_key=True,
+            bint use_list=True, bint raw=False, bint bytes_memoryview=False,
+            int timestamp=0, bint strict_map_key=True,
             unicode_errors=None,
             object_pairs_hook=None, ext_hook=ExtType,
             Py_ssize_t max_str_len=-1,
@@ -189,7 +193,7 @@ def unpackb(object packed, *, object object_hook=None, object list_hook=None,
 
     try:
         init_ctx(&ctx, object_hook, object_pairs_hook, list_hook, ext_hook,
-                 use_list, raw, timestamp, strict_map_key, cerr,
+                 use_list, raw, bytes_memoryview, timestamp, strict_map_key, cerr,
                  max_str_len, max_bin_len, max_array_len, max_map_len, max_ext_len)
         ret = unpack_construct(&ctx, buf, buf_len, &off)
     finally:
@@ -227,8 +231,12 @@ cdef class Unpacker(object):
         Otherwise, unpack to Python tuple. (default: True)
 
     :param bool raw:
-        If true, unpack msgpack raw to Python bytes.
+        If true, unpack msgpack raw strings to Python bytes.
         Otherwise, unpack to Python str by decoding with UTF-8 encoding (default).
+
+    :param bool bytes_memoryview:
+        If true, and if possible, unpack msgpack bytes to a memory_view.
+        Otherwise, unpack into a Python bytes (default).
 
     :param int timestamp:
         Control how timestamp type is unpacked:
@@ -325,7 +333,8 @@ cdef class Unpacker(object):
         self.buf = NULL
 
     def __init__(self, file_like=None, *, Py_ssize_t read_size=0,
-                 bint use_list=True, bint raw=False, int timestamp=0, bint strict_map_key=True,
+                 bint use_list=True, bint raw=False, bint bytes_memoryview=False,
+                 int timestamp=0, bint strict_map_key=True,
                  object object_hook=None, object object_pairs_hook=None, object list_hook=None,
                  unicode_errors=None, Py_ssize_t max_buffer_size=100*1024*1024,
                  object ext_hook=ExtType,
@@ -380,7 +389,7 @@ cdef class Unpacker(object):
             cerr = unicode_errors
 
         init_ctx(&self.ctx, object_hook, object_pairs_hook, list_hook,
-                 ext_hook, use_list, raw, timestamp, strict_map_key, cerr,
+                 ext_hook, use_list, raw, bytes_memoryview, timestamp, strict_map_key, cerr,
                  max_str_len, max_bin_len, max_array_len,
                  max_map_len, max_ext_len)
 
